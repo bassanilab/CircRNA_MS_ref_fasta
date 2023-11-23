@@ -1,17 +1,20 @@
 #!/usr/bin/env perl
 # Script to produce Met-restricted S2S BSJ fragments from
-# human_hg19_circRNAs_putative_spliced_sequence.fa.gz (circBase; http://www.circbase.org/)
-# v1.0 230823
+#  human_hg19_circRNAs_putative_spliced_sequence.fa.gz (circBase; http://www.circbase.org/)
+#  v1.0 230823
+#  v1.1 231123
 
 use strict;
 use warnings;
 use Getopt::Long;
 
 my $trim2MET;
+my $fdrGroup;
 my $help;
 
 GetOptions("trim2MET!" => \$trim2MET,
-	   "help!" => \$help );
+	   "addFDRgroup!" => \$fdrGroup,
+	   "help!" => \$help);
 
 die &usage if ($help);
 die &usage unless ($ARGV[0]);
@@ -36,6 +39,11 @@ my %code = (TTT=>'F', TTC=>'F', TTA=>'L', TTG=>'L',
 
 if ($trim2MET) {
     &trim2MET(@ARGV);
+    exit 0;
+}
+
+if ($fdrGroup) {
+    &addFDRgroup(@ARGV);
     exit 0;
 }
 
@@ -143,6 +151,7 @@ sub usage {
     "Usage: circRNA_MS_ref_fasta.pl [<options>] <input file> [output to STDOUT and STDERR]
 where options are
 -trim2MET       trim back globalApp seq if first ATG is seq-internal
+-addFDRgroup    add or change an FDR group in the fasta header (PE=1 for UniProt/contaminants; PE=4 for circRNAs)
 -help           print this\n";
 }
 
@@ -490,7 +499,7 @@ sub processCR {
 		$c = $c - $lhsC + 1;
 		$c-- if ($c <= 0); # correct for zero-less scale :-)
 		push @atgR, $c; # list all ATGs upstream of BSJ
-		last if ($e =~ /^BSJ/); # only ATGs upstream of BSJ
+		last if ($e =~ /^BSJ/); # only ATGs upstream of BSJ; woops never reached!
 	    }
 	    push @info2, 'BSJ:'.$bsjP[$f].$newPos;
 	    push @info2, join(':', 'ATG', join('|', @atgR));
@@ -596,6 +605,49 @@ sub trim2MET {
 	else { die "ATG of $header after BSJ\n"; }
     }
     close IN;
+}
+
+sub addFDRgroup {
+    $/ = "\n>"; # fasta sequences
+    my $file = shift;
+    
+    if ($file =~ /gz$/) { open IN, "zcat $file |" or die "Can't open $file: $!"; }
+    elsif ($file =~ /bz2$/) { open IN, "bzcat $file |" or die "Can't open $file: $!"; }
+    else { open IN, $file or die "Can't open $file: $!"; }
+
+    my %lDup = (); # duplication of protein sequences (rare)
+    
+    while (<IN>) {
+	s/>//g;           # remove '>'s
+	s/^(.+)$//m;      # remove header
+	my $header = $1;  # save header
+	my @h = split " ", $header;
+	my $pep = $_;
+	$pep =~ s/\n//g;  # remove all line breaks
+
+	my $newH;
+	my $pe;
+	if ($h[0] =~ /^sp/ or $h[0] =~ /^rev_sp/ ) { # UniProt, contamination or decoy
+	    for my $e (@h) {
+		if ($e =~ /^PE=\d+$/) {
+		    $e = "PE=1";
+		    $pe = 1;
+		}
+	    }
+	    if ($pe) { $newH = join(" ", @h); }
+	    else { $newH = join(" ", @h, 'PE=1'); }
+	}
+	elsif ($h[0] =~ /^hsa_circ/) { # circRNA; remodel UniProt style
+	    if ($header =~ /^PE=\d+$/) { die "circRNA already has PE assignment: $header\n"; }
+	    my @cid = split /\|/, $h[0];
+	    $newH = join(' ', join('|', $cid[0], $cid[0]), "circ$cid[3]", 'OS=Homo sapiens OX=9696', "GN=$cid[3]", 'PE=4');
+	}
+	else { print STDERR "Unrecognised header: $header\n"; }
+	
+	$pep =~ s/(.{60})/$1\n/g;
+	$pep =~ s/\s+$//s;
+	print ">$newH\n$pep\n";
+    }
 }
 
 sub translate {

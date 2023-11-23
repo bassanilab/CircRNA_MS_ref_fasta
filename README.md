@@ -14,12 +14,13 @@ Running the script with no options or input file gives:
 Usage: circRNA_MS_ref_fasta.pl [<options>] <input file> [output to STDOUT and STDERR]
 where options are
 -trim2MET       trim back globalApp seq if first ATG is seq-internal
+-addFDRgroup    add or change an FDR group in the fasta header (PE=1 for UniProt/contaminants; PE=4 for circRNAs)
 -help           print this
 ```
 A typical usage would be:
 
 ```
-circRNA_MS_ref_fasta.pl circBase_sequences.fa.gz > circBase_s2s_bsjf_pep.fa 2> circBase_s2s_bsjf_pep.log
+$ circRNA_MS_ref_fasta.pl circBase_sequences.fa.gz > circBase_s2s_bsjf_pep.fa 2> circBase_s2s_bsjf_pep.log
 ```
 
 Example sequence output:
@@ -55,10 +56,20 @@ Each circRNA processed by the script has an entry in the log output (to STDERR),
 
 Truncation to the first MET in the S2S fragment in the fasta peptide sequences can be achieved with the -trim2MET option as follows:
 ```
-circRNA_MS_ref_fasta.pl -trim2MET circBase_s2s_bsjf_pep.fa > circBase_s2s_bsjf_pep_MET.fa 2> circBase_s2s_bsjf_pep_MET.log
+$ circRNA_MS_ref_fasta.pl -trim2MET circBase_s2s_bsjf_pep.fa > circBase_s2s_bsjf_pep_MET.fa 2> circBase_s2s_bsjf_pep_MET.log
 ```
 Only those fasta peptides containing a MET that is the first MET in the S2S fragment will be truncated.
 
+The -addFDRgroup option adds or changes an FDR group in the fasta headers of, for example, the circBase_s2s_bsjf_pep_MET.fa file for use in group-specific FDR mass spectrometry analysis, compatible with FragPipe v20.0 onwards (https://github.com/Nesvilab/FragPipe). Two groups are implemented: one for circRNAs, designated 'PE=4'; and one for UniProt and contaminant fasta, designated 'PE=1'. Addition of the 'PE=4' group designation to a circRNA fasta modifies the header to a UniProt-like format:
+```
+$ circRNA_MS_ref_fasta.pl -addFDRgroup circBase_s2s_bsjf_pep_MET.fa > circBase_s2s_bsjf_pep_MET_gsFDR.fa 2> circBase_s2s_bsjf_pep_MET_gsFDR.log
+
+>hsa_circ_0000021_0|chr1:16044387-16047883+|NM_015164|PLEKHM2 BSJ:KA24|ATG:-6|6|10|59
+HLVRIMILEMCFQQCRLYPAQTGKAVPGCTWPSTRTPWRATCGCSRRT
+
+>hsa_circ_0000021_0|hsa_circ_0000021_0 circPLEKHM2 OS=Homo sapiens OX=9696 GN=PLEKHM2 PE=4
+HLVRIMILEMCFQQCRLYPAQTGKAVPGCTWPSTRTPWRATCGCSRRT
+```
 
 ## License
 
